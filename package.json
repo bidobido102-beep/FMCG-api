@@ -1,0 +1,13 @@
+{
+  "name": "fmcg-api",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "rss-parser": "^3.13.0"
+  },
+  "scripts": {
+    "start": "node server.js"
+  }
+}
