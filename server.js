@@ -1,6 +1,5 @@
 import express from "express";
 import cors from "cors";
-import Parser from "rss-parser";
 
 const app = express();
 
@@ -8,33 +7,22 @@ app.use(cors({
   origin: "*"
 }));
 
-const parser = new Parser();
-
 app.get("/api/news", async (req, res) => {
   try {
-    const feeds = [
-      "https://www.aljazeera.net/aljazeera/rss",
-      "https://www.skynewsarabia.com/web/rss"
-    ];
+    const response = await fetch("https://gnews.io/api/v4/search?q=egypt%20food&lang=ar&max=10&token=YOUR_API_KEY");
+    const data = await response.json();
 
-    let allNews = [];
+    const news = data.articles.map(item => ({
+      title: item.title,
+      link: item.url,
+      source: item.source.name
+    }));
 
-    for (let url of feeds) {
-      const feed = await parser.parseURL(url);
+    res.json(news);
 
-      const news = feed.items.slice(0, 10).map(item => ({
-        title: item.title,
-        link: item.link,
-        source: feed.title
-      }));
-
-      allNews = [...allNews, ...news];
-    }
-
-    res.json(allNews);
   } catch (e) {
     console.log(e);
-    res.status(500).json({ error: "failed to fetch news" });
+    res.status(500).json({ error: "failed" });
   }
 });
 
