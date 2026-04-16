@@ -10,7 +10,7 @@ const parser = new Parser();
 app.get("/api/news", async (req, res) => {
   try {
     const feed = await parser.parseURL(
-      "https://news.google.com/rss/search?q=السلع+الاستهلاكية+مصر"
+      "https://www.aljazeera.net/aljazeera/rss"
     );
 
     const news = feed.items.slice(0, 20).map(item => ({
