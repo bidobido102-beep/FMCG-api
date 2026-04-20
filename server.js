@@ -1,58 +1,67 @@
 import express from "express";
 import cors from "cors";
-import axios from "axios";
-import * as cheerio from "cheerio";
 
 const app = express();
 app.use(cors());
 
-let history = {
-  gold: [],
-  iron: []
-};
+let history = [];
 
-// 🟢 Scraping أسعار الحديد من موقع مصري
-async function getIronPrice() {
+app.get("/api/market", async (req, res) => {
   try {
-    const { data } = await axios.get("https://www.youm7.com/Section/أسعار/297/1");
-    const $ = cheerio.load(data);
 
-    let text = $("body").text();
-    let match = text.match(/الحديد.*?(\d{4,5})/);
+    // 🔹 ذهب (API حقيقي)
+    const goldRes = await fetch("https://api.gold-api.com/price/XAU");
+    const goldData = await goldRes.json();
 
-    return match ? parseInt(match[1]) : 42000;
+    const usdToEgp = 50;
+    const gold24 = (goldData.price * usdToEgp) / 31.1;
 
-  } catch {
-    return 42000;
+    const gold = {
+      "24": Math.round(gold24),
+      "21": Math.round(gold24 * 0.875),
+      "18": Math.round(gold24 * 0.75),
+      ounce: Math.round(gold24 * 31.1)
+    };
+
+    // 🔹 حديد وأسمنت (قابل للتحديث)
+    const building = {
+      iron: 42000,
+      cement: 2000
+    };
+
+    // 🔹 سيارات
+    const cars = [
+      { name: "Toyota Corolla", price: 1300000 },
+      { name: "Hyundai Elantra", price: 950000 },
+      { name: "Nissan Sunny", price: 800000 }
+    ];
+
+    // 🔹 FMCG
+    const fmcg = [
+      { name: "Coca-Cola", price: 15 },
+      { name: "Pepsi", price: 14 },
+      { name: "Chipsy", price: 10 },
+      { name: "Edita", price: 20 },
+      { name: "Eastern Tobacco", price: 35 }
+    ];
+
+    // 🔹 تخزين التاريخ
+    history.push({
+      gold21: gold["21"],
+      time: new Date().toLocaleTimeString()
+    });
+
+    res.json({
+      gold,
+      building,
+      cars,
+      fmcg,
+      history: history.slice(-20)
+    });
+
+  } catch (e) {
+    res.status(500).json({ error: "failed" });
   }
-}
-
-// 🟢 API ذهب
-async function getGold(){
-  const res = await axios.get("https://api.gold-api.com/price/XAU");
-  return res.data.price;
-}
-
-// 🟢 Endpoint
-app.get("/api/full", async (req, res) => {
-
-  const usdToEgp = 50;
-
-  const goldUSD = await getGold();
-  const gold21 = Math.round(((goldUSD * usdToEgp) / 31.1) * 0.875);
-
-  const iron = await getIronPrice();
-
-  // تخزين
-  history.gold.push(gold21);
-  history.iron.push(iron);
-
-  res.json({
-    gold21,
-    iron,
-    history
-  });
-
 });
 
 app.listen(10000);
