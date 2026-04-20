@@ -3,31 +3,34 @@ const Parser = require("rss-parser");
 
 const app = express();
 const parser = new Parser();
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 8080;
 
 /* =========================
-   ✅ حل مشكلة CORS (مهم)
+   ✅ حل CORS نهائي
 ========================= */
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   next();
 });
 
 /* =========================
-   ✅ أسعار حقيقية مبسطة
+   ✅ أسعار سوق (صادقة)
 ========================= */
 function getPrices() {
   return {
     gold: {
-      "24": "4650 جنيه",
-      "21": "4060 جنيه",
-      "18": "3480 جنيه",
-      "جنيه ذهب": "32480 جنيه"
+      trend: "↗ ارتفاع",
+      note: "الأسعار تختلف حسب الصاغة والمصنعية",
+      source: "تقارير السوق المحلية"
     },
-    steel: "41000 – 42000 جنيه / طن",
-    cement: "2000 – 2150 جنيه / طن",
+    steel: {
+      trend: "↗ زيادة",
+      note: "أسعار شركات الحديد الكبرى في مصر"
+    },
+    cement: {
+      trend: "→ استقرار",
+      note: "متوسط أسعار المصانع"
+    },
     lastUpdate: new Date().toLocaleDateString("ar-EG")
   };
 }
@@ -41,22 +44,46 @@ const FEEDS = [
   "https://dailynewsegypt.com/category/business/economy/feed/"
 ];
 
+const KEYWORDS = [
+  "price",
+  "prices",
+  "increase",
+  "fmcg",
+  "retail",
+  "consumer",
+  "coca",
+  "pepsi",
+  "chipsy",
+  "edita",
+  "tobacco",
+  "mansour",
+  "market"
+];
+
 async function getNews() {
   let news = [];
 
   for (let url of FEEDS) {
     try {
       const feed = await parser.parseURL(url);
+
       feed.items.forEach(item => {
-        news.push({
-          title: item.title,
-          link: item.link,
-          source: feed.title,
-          date: item.pubDate || "",
-          priceIncrease: /price|increase|rise|hike/i.test(
-            item.title + " " + (item.contentSnippet || "")
-          )
-        });
+        const text = (
+          item.title + " " + (item.contentSnippet || "")
+        ).toLowerCase();
+
+        if (KEYWORDS.some(k => text.includes(k))) {
+          news.push({
+            title: item.title,
+            link: item.link,
+            source: feed.title,
+            date: item.pubDate || "",
+            priceIncrease:
+              text.includes("price") ||
+              text.includes("increase") ||
+              text.includes("rise")
+          });
+        }
       });
     } catch (e) {
       console.log("Feed error:", url);
@@ -69,14 +96,14 @@ async function getNews() {
     if (seen.has(n.title)) return false;
     seen.add(n.title);
     return true;
-  }).slice(0, 25);
+  }).slice(0, 30);
 }
 
 /* =========================
-   ✅ Routes
+   ✅ API Routes
 ========================= */
 app.get("/", (req, res) => {
-  res.send("✅ FMCG API is running");
+  res.send("✅ FMCG Market Intelligence API running");
 });
 
 app.get("/api/data", async (req, res) => {
