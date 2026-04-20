@@ -4,32 +4,53 @@ import cors from "cors";
 const app = express();
 app.use(cors());
 
-let history = [];
+let lastPrice = null;
 
-app.get("/api/dashboard", async (req, res) => {
+app.get("/api/market", async (req, res) => {
   try {
-    const goldRes = await fetch("https://api.gold-api.com/price/XAU");
-    const goldData = await goldRes.json();
+    const response = await fetch("https://api.gold-api.com/price/XAU");
+    const data = await response.json();
 
+    const usdGold = data.price;
+
+    // تحويل تقريبي لجنيه مصري
     const usdToEgp = 50;
-    const gold24 = (goldData.price * usdToEgp) / 31.1;
+    const gold24 = (usdGold * usdToEgp) / 31.1;
 
-    const data = {
+    const prices = {
       gold: {
         "24": Math.round(gold24),
         "21": Math.round(gold24 * 0.875),
-        "18": Math.round(gold24 * 0.75)
+        "18": Math.round(gold24 * 0.75),
+        ounce: Math.round(gold24 * 31.1)
       },
-      iron: Math.floor(Math.random() * 5000 + 40000),
-      cars: Math.floor(Math.random() * 200000 + 800000),
-      fmcg: Math.floor(Math.random() * 10 + 20)
+
+      iron: "45000 جنيه / طن",
+      cement: "2000 جنيه / طن",
+
+      cars: {
+        toyota: "1,200,000 جنيه",
+        hyundai: "850,000 جنيه"
+      },
+
+      fmcg: {
+        "Coca Cola": "15 جنيه",
+        "Pepsi": "14 جنيه",
+        "Nestle Milk": "30 جنيه"
+      }
     };
 
-    history.push({ ...data, time: new Date() });
+    let trend = "stable";
+    if (lastPrice) {
+      if (prices.gold["21"] > lastPrice) trend = "up";
+      if (prices.gold["21"] < lastPrice) trend = "down";
+    }
+
+    lastPrice = prices.gold["21"];
 
     res.json({
-      data,
-      history: history.slice(-20)
+      prices,
+      trend
     });
 
   } catch (e) {
