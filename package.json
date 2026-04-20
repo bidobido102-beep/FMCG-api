@@ -1,7 +1,7 @@
 {
-  "name": "fmcg-news",
+  "name": "fmcg-news-egypt",
   "version": "1.0.0",
-  "description": "Free FMCG Prices & News Tracker",
+  "description": "Free FMCG & Price Tracker Egypt",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -9,6 +9,7 @@
   "dependencies": {
     "axios": "^1.6.0",
     "cheerio": "^1.0.0-rc.12",
-    "node-cron": "^3.0.2"
+    "node-cron": "^3.0.2",
+    "rss-parser": "^3.13.0"
   }
 }
