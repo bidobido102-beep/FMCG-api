@@ -1,20 +1,20 @@
 const express = require("express");
 const app = express();
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT;
 
 app.get("/", (req, res) => {
-  res.send("✅ Server is running");
+  res.send("✅ Server is running on Railway");
 });
 
 app.get("/api/data", (req, res) => {
   res.json({
     status: "OK",
-    message: "API is working",
+    message: "API works successfully ✅",
     time: new Date().toISOString()
   });
 });
 
 app.listen(PORT, () => {
-  console.log("Server listening on port", PORT);
+  console.log(`Server running on port ${PORT}`);
 });
