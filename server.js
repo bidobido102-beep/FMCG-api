@@ -5,124 +5,84 @@ const app = express();
 const parser = new Parser();
 const PORT = process.env.PORT;
 
-// =============================
-// مصادر الأخبار (مجانية)
-// =============================
+// ===== Sources =====
 const FEEDS = [
-  {
-    name: "Enterprise – Retail",
-    url: "https://enterprise.press/category/retail/feed/"
-  },
-  {
-    name: "Egypt Today – Business",
-    url: "https://www.egypttoday.com/rss.aspx?cat=business"
-  },
-  {
-    name: "Daily News Egypt – Retail",
-    url: "https://dailynewsegypt.com/category/business/retail/feed/"
-  },
-  {
-    name: "Daily News Egypt – Economy",
-    url: "https://dailynewsegypt.com/category/business/economy/feed/"
-  }
+  { name: "Enterprise Retail", url: "https://enterprise.press/category/retail/feed/" },
+  { name: "Egypt Today Business", url: "https://www.egypttoday.com/rss.aspx?cat=business" },
+  { name: "Daily News Egypt Retail", url: "https://dailynewsegypt.com/category/business/retail/feed/" },
+  { name: "Daily News Egypt Economy", url: "https://dailynewsegypt.com/category/business/economy/feed/" }
 ];
 
-// كلمات مفتاحية للفلترة (FMCG + أسعار)
-const KEYWORDS = [
-  "price",
-  "prices",
-  "increase",
-  "fmcg",
-  "retail",
-  "consumer",
-  "inflation",
-  "gold",
-  "steel",
-  "cement",
-  "coca",
-  "pepsi",
-  "chipsy",
-  "edita",
-  "tobacco",
-  "mansour",
-  "jti"
-];
+// ===== Keywords =====
+const PRICE_WORDS = ["price", "prices", "increase", "hike", "rise"];
+const COMPANIES = ["coca", "pepsi", "chipsy", "edita", "tobacco", "eastern", "mansour", "jti"];
+const PRODUCTS = ["gold", "steel", "cement"];
 
-// =============================
-// جلب وتجميع الأخبار
-// =============================
-async function getAllNews() {
-  let allNews = [];
-
-  for (const feedSource of FEEDS) {
-    try {
-      const feed = await parser.parseURL(feedSource.url);
-
-      feed.items.forEach(item => {
-        const text =
-          (item.title + " " + (item.contentSnippet || ""))
-            .toLowerCase();
-
-        const matched = KEYWORDS.some(keyword =>
-          text.includes(keyword)
-        );
-
-        if (matched) {
-          allNews.push({
-            title: item.title,
-            link: item.link,
-            source: feedSource.name,
-            date: item.pubDate || ""
-          });
-        }
-      });
-    } catch (error) {
-      console.log("❌ Error loading feed:", feedSource.name);
-    }
-  }
-
-  // إزالة التكرار
-  const uniqueNews = [];
-  const titles = new Set();
-
-  for (const news of allNews) {
-    if (!titles.has(news.title)) {
-      titles.add(news.title);
-      uniqueNews.push(news);
-    }
-  }
-
-  return uniqueNews.slice(0, 25);
+// ===== Helpers =====
+function detectCategory(text) {
+  if (PRODUCTS.some(w => text.includes(w))) return "Products";
+  if (COMPANIES.some(w => text.includes(w))) return "Companies";
+  return "Market";
 }
 
-// =============================
-// Endpoints
-// =============================
+function isPriceIncrease(text) {
+  return PRICE_WORDS.some(w => text.includes(w));
+}
 
-// الصفحة الرئيسية
+// ===== Collect News =====
+async function getNews() {
+  let news = [];
+
+  for (let feed of FEEDS) {
+    try {
+      const data = await parser.parseURL(feed.url);
+
+      data.items.forEach(item => {
+        const content = (item.title + " " + (item.contentSnippet || "")).toLowerCase();
+
+        news.push({
+          title: item.title,
+          link: item.link,
+          source: feed.name,
+          date: item.pubDate || "",
+          category: detectCategory(content),
+          priceIncrease: isPriceIncrease(content)
+        });
+      });
+    } catch (err) {
+      console.log("Error loading:", feed.name);
+    }
+  }
+
+  // Remove duplicates
+  const unique = [];
+  const titles = new Set();
+  news.forEach(n => {
+    if (!titles.has(n.title)) {
+      titles.add(n.title);
+      unique.push(n);
+    }
+  });
+
+  return unique.slice(0, 40);
+}
+
+// ===== Routes =====
 app.get("/", (req, res) => {
-  res.send("✅ FMCG API is running successfully");
+  res.send("✅ FMCG News API is running");
 });
 
-// API الأخبار
 app.get("/api/data", async (req, res) => {
-  try {
-    const news = await getAllNews();
+  const news = await getNews();
 
-    res.json({
-      status: "success",
-      lastUpdate: new Date().toISOString(),
-      count: news.length,
-      news: news
-    });
-  } catch (err) {
-    res.status(500).json({
-      status: "error",
-      message: "Failed to load news"
-    });
-  }
+  res.json({
+    status: "success",
+    updated: new Date().toISOString(),
+    total: news.length,
+    news: news
+  });
 });
 
 app.listen(PORT, () => {
-  console.log("✅ Server listening on port", PORT);
+  console.log("Server running on", PORT);
 });
