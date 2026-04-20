@@ -3,29 +3,30 @@ const cheerio = require("cheerio");
 const fs = require("fs");
 const cron = require("node-cron");
 const Parser = require("rss-parser");
+const express = require("express");
 
+const app = express();
 const parser = new Parser();
 const DATA_FILE = "data.json";
+const PORT = process.env.PORT || 3000;
 
-// كتابة البيانات
+// ================== Helpers ==================
 function saveData(data) {
   fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
   console.log("✅ Updated:", new Date().toLocaleString());
 }
 
-// 🥇 سعر الذهب
+// ================== Prices ==================
 async function getGoldPrice() {
   try {
     const res = await axios.get("https://www.goldpricez.com/eg/gold-rates");
     const $ = cheerio.load(res.data);
-    const price = $("table tr").eq(1).find("td").eq(1).text().trim();
-    return price || "غير متاح";
+    return $("table tr").eq(1).find("td").eq(1).text().trim() || "غير متاح";
   } catch {
     return "غير متاح";
   }
 }
 
-// 🏗️ أسعار تقريبية (ثابتة كبداية)
 async function getSteelPrice() {
   return "42000 جنيه / طن";
 }
@@ -34,12 +35,12 @@ async function getCementPrice() {
   return "2100 جنيه / طن";
 }
 
-// 📰 أخبار FMCG حقيقية (RSS)
+// ================== News ==================
 async function getFMCGNews() {
   const feeds = [
+    "https://enterprise.press/category/retail/feed/",
     "https://www.egypttoday.com/rss.aspx?cat=business",
-    "https://dailynewsegypt.com/category/business/retail/feed/",
-    "https://enterprise.press/category/retail/feed/"
+    "https://dailynewsegypt.com/category/business/retail/feed/"
   ];
 
   let news = [];
@@ -47,15 +48,12 @@ async function getFMCGNews() {
   for (let url of feeds) {
     try {
       const feed = await parser.parseURL(url);
-
       feed.items.slice(0, 5).forEach(item => {
-        const text = (item.title + " " + item.contentSnippet).toLowerCase();
-
+        const text = (item.title + item.contentSnippet).toLowerCase();
         if (
           text.includes("price") ||
-          text.includes("prices") ||
-          text.includes("fmcg") ||
           text.includes("retail") ||
+          text.includes("fmcg") ||
           text.includes("consumer") ||
           text.includes("coca") ||
           text.includes("pepsi") ||
@@ -70,16 +68,15 @@ async function getFMCGNews() {
           });
         }
       });
-
-    } catch (err) {
-      console.log("❌ RSS error:", url);
+    } catch (e) {
+      console.log("RSS error:", url);
     }
   }
 
   return news.slice(0, 8);
 }
 
-// تحديث كل شيء
+// ================== Update ==================
 async function updateAll() {
   const data = {
     lastUpdate: new Date().toISOString(),
@@ -88,25 +85,24 @@ async function updateAll() {
       steel: await getSteelPrice(),
       cement: await getCementPrice()
     },
-    companies: [
-      "Coca-Cola",
-      "Pepsi",
-      "Chipsy",
-      "Edita",
-      "Eastern Company",
-      "Al Mansour",
-      "JTI"
-    ],
     news: await getFMCGNews()
   };
 
   saveData(data);
 }
 
-// تشغيل أول مرة
 updateAll();
+cron.schedule("0 * * * *", updateAll);
 
-// تحديث كل ساعة ⏰
-cron.schedule("0 * * * *", () => {
-  updateAll();
+// ================== API ==================
+app.get("/api/data", (req, res) => {
+  if (fs.existsSync(DATA_FILE)) {
+    res.json(JSON.parse(fs.readFileSync(DATA_FILE)));
+  } else {
+    res.json({ error: "No data yet" });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log("🚀 Server running on", PORT);
 });
