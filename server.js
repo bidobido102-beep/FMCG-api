@@ -2,26 +2,38 @@ import express from "express";
 import cors from "cors";
 
 const app = express();
+app.use(cors());
 
-app.use(cors({
-  origin: "*"
-}));
+let priceHistory = [];
 
-app.get("/api/news", async (req, res) => {
+app.get("/api/gold", async (req, res) => {
   try {
-    const response = await fetch("https://gnews.io/api/v4/search?q=egypt%20food&lang=ar&max=10&token=YOUR_API_KEY");
+    const response = await fetch("https://api.gold-api.com/price/XAU");
     const data = await response.json();
 
-    const news = data.articles.map(item => ({
-      title: item.title,
-      link: item.url,
-      source: item.source.name
-    }));
+    const price = data.price;
 
-    res.json(news);
+    // حفظ السعر
+    priceHistory.push({
+      price,
+      time: new Date()
+    });
+
+    // آخر سعرين
+    let trend = "stable";
+    if (priceHistory.length > 1) {
+      const prev = priceHistory[priceHistory.length - 2].price;
+      if (price > prev) trend = "up";
+      if (price < prev) trend = "down";
+    }
+
+    res.json({
+      price,
+      trend,
+      history: priceHistory.slice(-10)
+    });
 
   } catch (e) {
-    console.log(e);
     res.status(500).json({ error: "failed" });
   }
 });
