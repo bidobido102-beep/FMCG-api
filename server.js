@@ -1,61 +1,82 @@
-import express from "express";
-import cors from "cors";
+const axios = require("axios");
+const cheerio = require("cheerio");
+const fs = require("fs");
+const cron = require("node-cron");
 
-const app = express();
-app.use(cors());
+// ملف البيانات
+const DATA_FILE = "data.json";
 
-let lastPrice = null;
+// دالة مساعدة
+function saveData(data) {
+  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+  console.log("✅ Data updated:", new Date().toLocaleString());
+}
 
-app.get("/api/market", async (req, res) => {
+// جلب سعر الذهب (مثال مجاني)
+async function getGoldPrice() {
   try {
-    const response = await fetch("https://api.gold-api.com/price/XAU");
-    const data = await response.json();
-
-    const usdGold = data.price;
-
-    // تحويل تقريبي لجنيه مصري
-    const usdToEgp = 50;
-    const gold24 = (usdGold * usdToEgp) / 31.1;
-
-    const prices = {
-      gold: {
-        "24": Math.round(gold24),
-        "21": Math.round(gold24 * 0.875),
-        "18": Math.round(gold24 * 0.75),
-        ounce: Math.round(gold24 * 31.1)
-      },
-
-      iron: "45000 جنيه / طن",
-      cement: "2000 جنيه / طن",
-
-      cars: {
-        toyota: "1,200,000 جنيه",
-        hyundai: "850,000 جنيه"
-      },
-
-      fmcg: {
-        "Coca Cola": "15 جنيه",
-        "Pepsi": "14 جنيه",
-        "Nestle Milk": "30 جنيه"
-      }
-    };
-
-    let trend = "stable";
-    if (lastPrice) {
-      if (prices.gold["21"] > lastPrice) trend = "up";
-      if (prices.gold["21"] < lastPrice) trend = "down";
-    }
-
-    lastPrice = prices.gold["21"];
-
-    res.json({
-      prices,
-      trend
-    });
-
-  } catch (e) {
-    res.status(500).json({ error: "failed" });
+    const res = await axios.get("https://www.goldpricez.com/eg/gold-rates");
+    const $ = cheerio.load(res.data);
+    const price = $("table tr").eq(1).find("td").eq(1).text().trim();
+    return price || "غير متاح";
+  } catch {
+    return "غير متاح";
   }
-});
+}
 
-app.listen(10000);
+// أسعار الحديد والأسمنت (مثال مبسط)
+async function getSteelPrice() {
+  return "42000 جنيه للطن";
+}
+
+async function getCementPrice() {
+  return "2100 جنيه للطن";
+}
+
+// أخبار FMCG (ثابتة كبداية)
+function getFMCGNews() {
+  return [
+    {
+      title: "زيادة متوقعة في أسعار السلع الاستهلاكية",
+      source: "Market Watch",
+      date: new Date().toLocaleDateString()
+    },
+    {
+      title: "إيديتا تراجع خطط التسعير للربع القادم",
+      source: "Business News",
+      date: new Date().toLocaleDateString()
+    }
+  ];
+}
+
+// تحديث كل البيانات
+async function updateAll() {
+  const data = {
+    lastUpdate: new Date().toISOString(),
+    prices: {
+      gold: await getGoldPrice(),
+      steel: await getSteelPrice(),
+      cement: await getCementPrice()
+    },
+    companies: [
+      "Coca-Cola",
+      "Pepsi",
+      "Chipsy",
+      "Edita",
+      "Eastern Company",
+      "Almansour",
+      "JTI"
+    ],
+    news: getFMCGNews()
+  };
+
+  saveData(data);
+}
+
+// تشغيل أول مرة
+updateAll();
+
+// تكرار كل ساعة ⏰
+cron.schedule("0 * * * *", () => {
+  updateAll();
+});
