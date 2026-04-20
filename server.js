@@ -13,16 +13,19 @@ app.get("/api/dashboard", async (req, res) => {
 
     const usdToEgp = 50;
     const gold24 = (goldData.price * usdToEgp) / 31.1;
-    const gold21 = Math.round(gold24 * 0.875);
 
     const data = {
-      gold21
+      gold: {
+        "24": Math.round(gold24),
+        "21": Math.round(gold24 * 0.875),
+        "18": Math.round(gold24 * 0.75)
+      },
+      iron: Math.floor(Math.random() * 5000 + 40000),
+      cars: Math.floor(Math.random() * 200000 + 800000),
+      fmcg: Math.floor(Math.random() * 10 + 20)
     };
 
-    history.push({
-      price: gold21,
-      time: new Date().toLocaleTimeString()
-    });
+    history.push({ ...data, time: new Date() });
 
     res.json({
       data,
