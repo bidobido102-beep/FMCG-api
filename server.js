@@ -1,58 +1,65 @@
 import express from "express";
 import cors from "cors";
 import axios from "axios";
-import * as cheerio from "cheerio";
+import { createClient } from "@supabase/supabase-js";
 
 const app = express();
 app.use(cors());
 
-let history = {
-  gold: [],
-  iron: []
-};
+// ✅ ربط Supabase
+const supabase = createClient(
+  "https://pqoidsjjghgivhhdpfqb.supabase.co",
+  "sb_publishable_wgH3Lpf0D7124FV4dvTIkg_nnKnYVnc"
+);
 
-// 🟢 Scraping أسعار الحديد من موقع مصري
-async function getIronPrice() {
-  try {
-    const { data } = await axios.get("https://www.youm7.com/Section/أسعار/297/1");
-    const $ = cheerio.load(data);
-
-    let text = $("body").text();
-    let match = text.match(/الحديد.*?(\d{4,5})/);
-
-    return match ? parseInt(match[1]) : 42000;
-
-  } catch {
-    return 42000;
-  }
-}
-
-// 🟢 API ذهب
+// 🟢 جلب سعر الذهب
 async function getGold(){
   const res = await axios.get("https://api.gold-api.com/price/XAU");
   return res.data.price;
 }
 
-// 🟢 Endpoint
+// 🟢 API الرئيسي
 app.get("/api/full", async (req, res) => {
+  try{
 
-  const usdToEgp = 50;
+    const usdToEgp = 50;
 
-  const goldUSD = await getGold();
-  const gold21 = Math.round(((goldUSD * usdToEgp) / 31.1) * 0.875);
+    const goldUSD = await getGold();
+    const gold21 = Math.round(((goldUSD * usdToEgp)/31.1)*0.875);
 
-  const iron = await getIronPrice();
+    // باقي الأسواق (مؤقت)
+    const iron = 42000;
+    const cars = 1000000;
+    const fmcg = 20;
 
-  // تخزين
-  history.gold.push(gold21);
-  history.iron.push(iron);
+    // 💾 تخزين في قاعدة البيانات
+    await supabase.from("market").insert([{
+      gold: gold21,
+      iron,
+      cars,
+      fmcg
+    }]);
 
-  res.json({
-    gold21,
-    iron,
-    history
-  });
+    // 📊 جلب آخر البيانات
+    const { data } = await supabase
+      .from("market")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(20);
 
+    res.json({
+      gold21,
+      iron,
+      cars,
+      fmcg,
+      history: data.reverse()
+    });
+
+  }catch(e){
+    res.status(500).json({ error:"failed", details: e.message });
+  }
 });
 
-app.listen(10000);
+app.listen(10000, () => {
+  console.log("Server running...");
+});
